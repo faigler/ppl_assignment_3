@@ -218,11 +218,37 @@ export const typeofLetrec = (exp: LetrecExp, tenv: TEnv): Result<TExp> => {
 //   If typeof(exp.val, tenv) = texp
 //   Then typeof(exp) = void
 export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> =>
-    makeFailure("HW3 2.1 - Implement this function");
+    bind(typeofExp(exp.val, tenv), (valType: TExp) =>
+        bind(checkEqualType(exp.var.texp, valType, exp), _ =>
+            makeOk(makeVoidTExp())));
 
 // Purpose: compute the type of a program
 // Thread the TEnv through top-level expressions. A define extends the TEnv
 // for the expressions that follow it; the program type is the type of the
 // last expression.
+const typeofProgramExps = (exps: List<Exp>, tenv: TEnv): Result<TExp> => {
+    if (!isNonEmptyList<Exp>(exps)) {
+        return makeFailure(`Unexpected empty program`);
+    }
+
+    const firstExp = first(exps);
+    const restExps = rest(exps);
+
+    if (isEmpty(restExps)) {
+        return typeofExp(firstExp, tenv);
+    }
+
+    if (isDefineExp(firstExp)) {
+        return bind(typeofDefine(firstExp, tenv), _ =>
+            typeofProgramExps(
+                restExps,
+                makeExtendTEnv([firstExp.var.var], [firstExp.var.texp], tenv)
+            ));
+    }
+
+    return bind(typeofExp(firstExp, tenv), _ =>
+        typeofProgramExps(restExps, tenv));
+};
+
 export const typeofProgram = (exp: Program, tenv: TEnv): Result<TExp> =>
-    makeFailure("HW3 2.2 - Implement this function");
+    typeofProgramExps(exp.exps, tenv);
